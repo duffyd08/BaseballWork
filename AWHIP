@@ -1,0 +1,56 @@
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+df_awhip = pd.read_csv('/content/awhip.csv')
+
+awhip_stats = ['Name', 'Age', 'Tm','BB', 'HBP', 'H', '2B', '3B', 'HR', 'IP']
+df_awhip = df_awhip[awhip_stats]
+
+df_awhip['BB'] *= 0.696
+df_awhip['HBP'] *= 0.726
+df_awhip['H'] *= 0.882
+df_awhip['2B'] *= 1.243
+df_awhip['3B'] *= 1.568
+df_awhip['HR'] *= 2.002
+
+df_awhip['AWHIP'] = (df_awhip['BB'] + df_awhip['HBP'] + df_awhip['H'] + df_awhip['2B'] + df_awhip['3B'] + df_awhip['HR']) / df_awhip['IP']
+
+df_filtered = df_awhip[df_awhip['IP'] > 100]
+
+df_sorted = df_filtered.sort_values(by='AWHIP', ascending=False)
+
+top_10 = df_sorted.head(11)
+bottom_10 = df_sorted.tail(10)
+
+print("Top 10 Players:")
+print(top_10)
+
+print("\nBottom 10 Players:")
+print(bottom_10)
+
+top_10 = df_sorted.head(10)
+bottom_10 = df_sorted.tail(10)
+
+
+#want data to read from highest to lowest
+bottom_10 = bottom_10[::-1]
+
+#barchart here
+
+plt.figure(figsize=(10, 6))
+sns.barplot(x='AWHIP', y='Name', data=top_10, palette='flare')
+plt.xlabel('AWHIP')
+plt.ylabel('Player Name')
+plt.title('10 Highest AWHIP (Adjusted WHIP)\n 2023 MLB Season (min 100 Innings Pitched)')
+plt.tight_layout()
+plt.show()
+
+#barchart here
+plt.figure(figsize=(10, 6))
+sns.barplot(x='AWHIP', y='Name', data=bottom_10, palette='flare')
+plt.xlabel('AWHIP')
+plt.ylabel('Player Name')
+plt.title('10 Lowest AWHIP (Adjusted WHIP)\n 2023 MLB Season (min 100 Innings Pitched)')
+plt.tight_layout()
+plt.show()
