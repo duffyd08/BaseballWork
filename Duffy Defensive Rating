@@ -1,0 +1,66 @@
+#In Python for me
+import pandas as pd
+pip install pybaseball
+
+error_df = pd.read_csv('/content/errors_savant_good.csv')
+
+def extract_and_create_key_mlbam(row):
+    error_types = {
+        'pitcher': 'pitcher',
+        'catcher': 'fielder_2',
+        'first baseman': 'fielder_3',
+        '1B': 'fielder_3',
+        'second baseman': 'fielder_4',
+        'third baseman': 'fielder_5',
+        'shortstop': 'fielder_6',
+        'left fielder': 'fielder_7',
+        'center fielder': 'fielder_8',
+        'right fielder': 'fielder_9',
+    }
+
+    if isinstance(row['des'], str):
+        for error_type, fielder_position in error_types.items():
+            if f"error by {error_type}" in row['des']:
+                row['key_mlbam'] = row[fielder_position]
+
+    return row
+
+error_id = error_df.apply(extract_and_create_key_mlbam, axis=1)
+
+error_id['weight_error'] = -abs(error_id['delta_home_win_exp'])
+
+final_error_df = error_id.groupby(['key_mlbam', 'year_of_game'])['weight_error'].sum().reset_index()
+final_error_df['error_count'] = error_id.groupby(['key_mlbam', 'year_of_game']).cumcount() + 1
+
+final_error_df['key_mlbam'] = final_error_df['key_mlbam'].astype(int)
+
+#This will return the player_id codes to then copy back into to pull the individual names. I found that this worked best for me but there are surely other ways to do this. 
+print(final_error_df['key_mlbam'].tolist())
+
+from pybaseball import playerid_reverse_lookup
+error_player_ids = final_error_df['key_mlbam'].tolist()
+error_players = playerid_reverse_lookup(error_player_ids, key_type='mlbam')
+
+id_and_error_df = pd.merge(final_error_df, error_players, on='key_mlbam')
+
+id_and_error_df['name_first'] = id_and_error_df['name_first'].str.title()
+id_and_error_df['name_last'] = id_and_error_df['name_last'].str.title()
+
+id_and_error_df['player_name'] = id_and_error_df['name_first'] + ' ' + id_and_error_df['name_last']
+usable_df = id_and_error_df[['key_mlbam', 'year_of_game', 'weight_error', 'player_name']]
+-----
+adv_def_df = pd.read_csv('/content/FanGraphs Defensive Stats since 2016 - Sheet1.csv')
+def_val = pd.merge(usable_df, adv_def_df, on=['player_name', 'year_of_game'], how='left')
+
+#2016 and beyond since that is the start of Statcast OAA
+def_val = def_val[def_val['year_of_game'] >= 2016]
+
+new_df_metric = def_val[['player_name', 'year_of_game', 'weight_error', 'OAA', 'DRS']]
+
+# Use whatever weights you feel necessary
+weights = {'weight_error': x, 'OAA': x, 'DRS': x}
+
+# Create a new column 'def_rat' by summing the weighted columns
+new_df_metric['def_rat'] = new_df_metric[['weight_error', 'OAA', 'DRS']].mul(weights).sum(axis=1)
+
+rat_since_16_df = new_df_metric.groupby(['player_name', 'year_of_game']).sum().reset_index()
